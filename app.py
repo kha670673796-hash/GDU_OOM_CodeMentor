@@ -169,11 +169,11 @@ with st.sidebar:
                         st.session_state.renaming_id = None
                         st.rerun()
                 with col_rename:
-                    if st.button("✏️", key=f"rename_btn_{session_id}", help="Đổi tên cuộc trò chuyện này"):
+                    if st.button("Sửa", key=f"rename_btn_{session_id}", help="Đổi tên cuộc trò chuyện này"):
                         st.session_state.renaming_id = session_id
                         st.rerun()
                 with col_del:
-                    if st.button("🗑️", key=f"del_{session_id}", help="Xóa cuộc trò chuyện này"):
+                    if st.button("Xóa", key=f"del_{session_id}", help="Xóa cuộc trò chuyện này"):
                         delete_chat(session_id)
                         st.session_state.renaming_id = None
                         st.rerun()
