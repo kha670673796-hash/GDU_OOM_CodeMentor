@@ -160,25 +160,20 @@ with st.sidebar:
                         st.session_state.renaming_id = None
                         st.rerun()
             else:
-                # Sử dụng selectbox thay thế popover để triệt tiêu hoàn toàn hiện tượng lệch mũi tên
-                col_chat, col_action = st.columns([4, 1.5])
+                # Bố cục 3 cột tỷ lệ chuẩn [3.2 : 0.9 : 0.9] với nút tràn viền co giãn hoàn hảo
+                col_chat, col_rename, col_del = st.columns([3.2, 0.9, 0.9])
                 with col_chat:
                     btn_type = "primary" if session_id == st.session_state.session_id else "secondary"
                     if st.button(f"💬 {title}", key=f"load_{session_id}", use_container_width=True, type=btn_type):
                         load_chat_from_disk(session_id)
                         st.session_state.renaming_id = None
                         st.rerun()
-                with col_action:
-                    action = st.selectbox(
-                        "Tùy chọn", 
-                        ["⚙️", "✏️ Sửa", "🗑️ Xóa"], 
-                        key=f"action_{session_id}", 
-                        label_visibility="collapsed"
-                    )
-                    if action == "✏️ Sửa":
+                with col_rename:
+                    if st.button("✏️", key=f"rename_btn_{session_id}", use_container_width=True, help="Đổi tên đoạn chat này"):
                         st.session_state.renaming_id = session_id
                         st.rerun()
-                    elif action == "🗑️ Xóa":
+                with col_del:
+                    if st.button("🗑️", key=f"del_{session_id}", use_container_width=True, help="Xóa đoạn chat này"):
                         delete_chat(session_id)
                         st.session_state.renaming_id = None
                         st.rerun()
