@@ -160,23 +160,28 @@ with st.sidebar:
                         st.session_state.renaming_id = None
                         st.rerun()
             else:
-                # Sử dụng menu 3 chấm chuẩn UX hiện đại, không sợ bị bóp méo giao diện
-                col_chat, col_menu = st.columns([5, 1])
+                # Sử dụng selectbox thay thế popover để triệt tiêu hoàn toàn hiện tượng lệch mũi tên
+                col_chat, col_action = st.columns([4, 1.5])
                 with col_chat:
                     btn_type = "primary" if session_id == st.session_state.session_id else "secondary"
                     if st.button(f"💬 {title}", key=f"load_{session_id}", use_container_width=True, type=btn_type):
                         load_chat_from_disk(session_id)
                         st.session_state.renaming_id = None
                         st.rerun()
-                with col_menu:
-                    with st.popover("⋮", help="Tùy chọn cuộc trò chuyện"):
-                        if st.button("✏️ Đổi tên", key=f"rename_btn_{session_id}", use_container_width=True):
-                            st.session_state.renaming_id = session_id
-                            st.rerun()
-                        if st.button("🗑️ Xóa", key=f"del_{session_id}", use_container_width=True):
-                            delete_chat(session_id)
-                            st.session_state.renaming_id = None
-                            st.rerun()
+                with col_action:
+                    action = st.selectbox(
+                        "Tùy chọn", 
+                        ["⚙️", "✏️ Sửa", "🗑️ Xóa"], 
+                        key=f"action_{session_id}", 
+                        label_visibility="collapsed"
+                    )
+                    if action == "✏️ Sửa":
+                        st.session_state.renaming_id = session_id
+                        st.rerun()
+                    elif action == "🗑️ Xóa":
+                        delete_chat(session_id)
+                        st.session_state.renaming_id = None
+                        st.rerun()
 
     st.markdown("---")
     with st.expander("📌 Cẩm nang & Hỗ trợ (Quan trọng)"):
