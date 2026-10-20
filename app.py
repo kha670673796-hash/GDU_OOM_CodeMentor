@@ -160,23 +160,23 @@ with st.sidebar:
                         st.session_state.renaming_id = None
                         st.rerun()
             else:
-                # Hiển thị nút chọn chat, nút đổi tên (✏️) và nút xóa (🗑️)
-                col_chat, col_rename, col_del = st.columns([4, 1, 1])
+                # Sử dụng menu 3 chấm chuẩn UX hiện đại, không sợ bị bóp méo giao diện
+                col_chat, col_menu = st.columns([5, 1])
                 with col_chat:
                     btn_type = "primary" if session_id == st.session_state.session_id else "secondary"
                     if st.button(f"💬 {title}", key=f"load_{session_id}", use_container_width=True, type=btn_type):
                         load_chat_from_disk(session_id)
                         st.session_state.renaming_id = None
                         st.rerun()
-                with col_rename:
-                    if st.button("Sửa", key=f"rename_btn_{session_id}", help="Đổi tên cuộc trò chuyện này"):
-                        st.session_state.renaming_id = session_id
-                        st.rerun()
-                with col_del:
-                    if st.button("Xóa", key=f"del_{session_id}", help="Xóa cuộc trò chuyện này"):
-                        delete_chat(session_id)
-                        st.session_state.renaming_id = None
-                        st.rerun()
+                with col_menu:
+                    with st.popover("⋮", help="Tùy chọn cuộc trò chuyện"):
+                        if st.button("✏️ Đổi tên", key=f"rename_btn_{session_id}", use_container_width=True):
+                            st.session_state.renaming_id = session_id
+                            st.rerun()
+                        if st.button("🗑️ Xóa", key=f"del_{session_id}", use_container_width=True):
+                            delete_chat(session_id)
+                            st.session_state.renaming_id = None
+                            st.rerun()
 
     st.markdown("---")
     with st.expander("📌 Cẩm nang & Hỗ trợ (Quan trọng)"):
