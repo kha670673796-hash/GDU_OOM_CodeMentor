@@ -28,8 +28,8 @@ def get_system_prompt():
 QUY TẮC NỀN TẢNG:
 1. GIỚI HẠN CHỦ ĐỀ: BẠN CHỈ HỖ TRỢ VỀ LẬP TRÌNH VÀ CODE. Kiên quyết từ chối các chủ đề ngoài lề lịch sự.
 2. NẾU NGƯỜI DÙNG GỬI CODE TRỐNG KHÔNG (không kèm yêu cầu): BẠN BẮT BUỘC PHẢI DỪNG LẠI và hỏi 3 thông tin: (1) Năm học/trình độ? (2) Ngôn ngữ lập trình? (3) Mục tiêu cần hỗ trợ là gì?
-3. NẾU CÓ YÊU CẦU RÕ RÀNG HOẶC DÙNG NÚT GỢI Ý: Phân tích và giải quyết code ngay lập tức theo phong cách giảng viên tận tâm.
-4. KẾT NỐI NGỮ CẢNH: Luôn bám sát [TÓM TẮT NGỮ CẢNH] hoặc lệnh !load từ người dùng."""
+3. NẾU CÓ YÊU CẦU RÕ RÀNG HOẶC DÙNG NÚT GỢI Ý: Phân tích, giải quyết code hoặc khởi tạo mã nguồn mới ngay lập tức theo phong cách giảng viên tận tâm.
+4. TỰ ĐỘNG HÓA NGỮ CẢNH: Hệ thống tự động ghi nhớ và nén ngữ cảnh xuyên suốt phiên làm việc."""
 
 def init_new_session():
     st.session_state.session_id = str(uuid.uuid4())
@@ -69,13 +69,13 @@ def delete_chat(session_id):
         init_new_session()
 
 def generate_smart_title(first_user_msg):
-    clean_msg = first_user_msg.replace("!load", "").strip()
+    clean_msg = first_user_msg.strip()
     if not clean_msg:
         return "Gỡ lỗi mã nguồn"
     try:
         res = client.chat.completions.create(
             model="openai/gpt-4o-mini",
-            messages=[{"role": "user", "content": f"Tóm tắt câu sau thành 1 tiêu đề ngắn gọn (3-5 từ): '{clean_msg}'"}],
+            messages=[{"role": "user", "content": f"Tóm tắt câu sau thành 1 tiêu đề ngắn gọn (3-5 từ): '{clean_msg[:100]}''"}],
             temperature=0.3
         )
         return res.choices[0].message.content.replace('"', '').replace("'", "")
@@ -86,7 +86,7 @@ def force_summarize():
     if len(st.session_state.messages) < 3: 
         return
         
-    with st.spinner("🔄 Đang đóng gói ngữ cảnh hệ thống..."):
+    with st.spinner("🔄 Đang tự động đóng gói ngữ cảnh..."):
         messages_to_summarize = st.session_state.messages[1:]
         prompt = f"Ngữ cảnh cũ: {st.session_state.context_summary}\n\nHội thoại:\n"
         for msg in messages_to_summarize:
@@ -180,7 +180,7 @@ with st.sidebar:
 
     st.markdown("---")
     with st.expander("📌 Cẩm nang & Hỗ trợ (Quan trọng)"):
-        st.warning("⚠️ **Lưu ý Ngữ Cảnh & Lưu Trữ:**\n\n1. **Đổi chủ đề:** Bấm 'Bắt đầu Chủ đề mới' để tránh AI nhầm lẫn dữ liệu cũ.\n2. **Lưu tiến trình (!save):** Gõ `!save` để đóng gói ngữ cảnh trước khi rời đi.\n3. **Khôi phục (!load):** Chọn lại tên chat cũ, gõ `!load [yêu cầu mới]` để tiếp tục.")
+        st.warning("⚠️ **Lưu ý Tự Động Hóa:**\n\n1. **Đổi chủ đề:** Bấm 'Bắt đầu Chủ đề mới' để làm sạch ngữ cảnh.\n2. **Tự động lưu (Auto-Save):** Hệ thống tự động lưu mọi tiến trình vào bộ nhớ ngầm, bạn có thể đóng trình duyệt bất cứ lúc nào.\n3. **Tải file code:** Sử dụng công cụ đính kèm file ngay bên dưới khung chat để AI đọc code trực tiếp.")
         st.markdown("**Kênh Hỗ trợ & Báo lỗi:**")
         st.link_button("✈️ Telegram Admin", "https://t.me/hkha45", use_container_width=True)
         st.link_button("👾 Server Discord", "https://discord.gg/dXMjFUXeJj", use_container_width=True)
@@ -189,21 +189,34 @@ with st.sidebar:
 st.title("👨‍💻 GDU_OOM_CodeMentor Workspace")
 st.markdown(f"### *{st.session_state.chat_title}*")
 
-# Thanh Gợi ý thao tác nhanh
+# Thanh Gợi ý thao tác nhanh (Đã bổ sung nút Khởi tạo code mới)
 st.markdown("**Gợi ý thao tác nhanh:**")
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 trigger_prompt = None
 with col1:
-    if st.button("🔍 Rà soát lỗi Logic", use_container_width=True):
-        trigger_prompt = "Tôi có một đoạn code đang bị lỗi logic. Hãy chuẩn bị tinh thần rà soát từng dòng."
+    if st.button("🔍 Rà soát lỗi", use_container_width=True):
+        trigger_prompt = "Tôi có một đoạn code đang bị lỗi. Hãy rà soát giúp tôi."
 with col2:
     if st.button("💡 Giải thích luồng", use_container_width=True):
-        trigger_prompt = "Hãy đóng vai trò là một giảng viên giải thích chi tiết hoạt động của code."
+        trigger_prompt = "Hãy đóng vai trò giảng viên giải thích chi tiết hoạt động của code."
 with col3:
     if st.button("🚀 Tối ưu hiệu suất", use_container_width=True):
-        trigger_prompt = "Hãy đánh giá độ phức tạp thuật toán và đề xuất giải pháp tối ưu code."
+        trigger_prompt = "Hãy đánh giá và đề xuất giải pháp tối ưu hóa đoạn code này."
+with col4:
+    if st.button("✨ Khởi tạo code", use_container_width=True):
+        trigger_prompt = "Hãy giúp tôi viết một đoạn mã nguồn đơn giản theo yêu cầu mới."
 
 st.divider()
+
+# TÍNH NĂNG MỚI: Tải lên file mã nguồn trực tiếp
+uploaded_file = st.file_uploader("📂 Tải lên file mã nguồn (.py, .txt, .cpp, .lua)", type=["py", "txt", "cpp", "lua", "js", "java"])
+file_content_text = ""
+if uploaded_file is not None:
+    try:
+        file_content_text = uploaded_file.read().decode("utf-8")
+        st.success(f"Đã tải lên thành công file: **{uploaded_file.name}** ({len(file_content_text)} ký tự)")
+    except Exception as e:
+        st.error(f"Lỗi đọc file: {e}")
 
 # Hiển thị các tin nhắn trong phiên
 for msg in st.session_state.messages:
@@ -212,30 +225,21 @@ for msg in st.session_state.messages:
             st.markdown(msg["content"])
 
 def process_ai_response(user_message):
-    is_save_cmd = user_message.strip().lower() == "!save"
-    is_load_cmd = user_message.strip().lower().startswith("!load")
+    # Nếu có đính kèm file, tự động gộp nội dung file vào tin nhắn gửi cho AI
+    final_message = user_message
+    if file_content_text:
+        final_message = f"{user_message}\n\n[NỘI DUNG MÃ NGUỒN TỪ FILE ĐÍNH KÈM]:\n```python\n{file_content_text}\n```"
 
-    if st.session_state.chat_title == "Cuộc trò chuyện mới" and not is_save_cmd:
+    if st.session_state.chat_title == "Cuộc trò chuyện mới":
         st.session_state.chat_title = generate_smart_title(user_message)
     
-    st.session_state.messages.append({"role": "user", "content": user_message})
+    st.session_state.messages.append({"role": "user", "content": final_message})
     with st.chat_message("user"):
         st.markdown(user_message)
-    
-    # XỬ LÝ LỆNH !SAVE
-    if is_save_cmd:
-        with st.spinner("Đang lưu trữ tiến trình ngữ cảnh..."):
-            force_summarize()
-            reply = "💾 **Tiến trình đã được lưu an toàn!** Bạn có thể đóng trình duyệt. Lần tới quay lại, hãy chọn đúng tên lịch sử này và dùng lệnh `!load [yêu cầu mới]` để tiếp tục."
-            st.session_state.messages.append({"role": "assistant", "content": reply})
-            with st.chat_message("assistant"):
-                st.markdown(reply)
-            save_chat_to_disk()
-            return
+        if file_content_text:
+            st.caption(f"📎 Đã đính kèm nội dung từ file code.")
 
     api_messages = list(st.session_state.messages)
-    if is_load_cmd:
-        api_messages.append({"role": "system", "content": "Người dùng vừa kích hoạt lệnh !load để khôi phục phiên. Hãy dựa vào TÓM TẮT NGỮ CẢNH để tiếp tục giải quyết yêu cầu."})
 
     # Gọi API AI phản hồi
     with st.chat_message("assistant"):
@@ -259,6 +263,7 @@ def process_ai_response(user_message):
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
                 
+                # Tự động nén ngữ cảnh và tự động lưu ngầm (Auto-Save)
                 if len(st.session_state.messages) > 10:
                     force_summarize()
                     st.toast("🧠 Hệ thống đã tự động nén gọn ngữ cảnh để duy trì độ mượt mà!", icon="✅")
@@ -271,6 +276,6 @@ if trigger_prompt:
     process_ai_response(trigger_prompt)
     st.rerun()
 
-if user_input := st.chat_input("Dán mã nguồn hoặc nhập câu hỏi (Dùng !save / !load để quản lý ngữ cảnh)..."):
+if user_input := st.chat_input("Dán mã nguồn hoặc nhập câu hỏi trực tiếp..."):
     process_ai_response(user_input)
     st.rerun()
