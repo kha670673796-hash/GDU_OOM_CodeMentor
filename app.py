@@ -35,7 +35,7 @@ def init_new_session():
     st.session_state.session_id = str(uuid.uuid4())
     st.session_state.chat_title = "Cuộc trò chuyện mới"
     st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-    st.session_state.full_history = [] # Tách biệt luồng hiển thị để không bao giờ mất tin nhắn cũ
+    st.session_state.full_history = [] 
     st.session_state.context_summary = ""
 
 def save_chat_to_disk():
@@ -61,7 +61,6 @@ def load_chat_from_disk(session_id):
             st.session_state.chat_title = data.get("title", "Lịch sử chat")
             st.session_state.context_summary = data.get("summary", "")
             st.session_state.messages = data.get("messages", [])
-            # Lấy lịch sử hiển thị đầy đủ (chống lỗi với các file cũ chưa có full_history)
             raw_history = data.get("full_history", data.get("messages", []))
             st.session_state.full_history = [m for m in raw_history if m["role"] != "system"]
 
@@ -90,7 +89,7 @@ def force_summarize():
     if len(st.session_state.messages) < 3: 
         return
         
-    with st.spinner("🔄 Đang đóng gói ngữ cảnh hệ thống..."):
+    with st.spinner("🔄 Đang nén toàn bộ ngữ cảnh hệ thống..."):
         messages_to_summarize = st.session_state.messages[1:]
         prompt = f"Ngữ cảnh cũ: {st.session_state.context_summary}\n\nHội thoại:\n"
         for msg in messages_to_summarize:
@@ -107,7 +106,6 @@ def force_summarize():
             new_summary = res.choices[0].message.content
             st.session_state.context_summary = new_summary
             
-            # Chỉ giới hạn mảng API ngầm, không tác động đến full_history hiển thị
             new_messages = [st.session_state.messages[0]]
             new_messages.append({"role": "system", "content": f"[TÓM TẮT NGỮ CẢNH BẮT BUỘC]: {new_summary}"})
             new_messages.extend(st.session_state.messages[-2:])
@@ -118,11 +116,10 @@ def force_summarize():
 # --- KHỞI TẠO STATE ---
 if "session_id" not in st.session_state:
     init_new_session()
-
 if "renaming_id" not in st.session_state:
     st.session_state.renaming_id = None
 
-# --- GIAO DIỆN SIDEBAR (Tối ưu cho cảm ứng & mobile) ---
+# --- GIAO DIỆN SIDEBAR ---
 with st.sidebar:
     if st.button("➕ Bắt đầu Chủ đề mới", use_container_width=True, type="primary"):
         init_new_session()
@@ -133,7 +130,6 @@ with st.sidebar:
     search_query = st.text_input("Tìm kiếm", label_visibility="collapsed", placeholder="🔍 Gõ để tìm tin nhắn cũ...")
     
     st.markdown("### 📂 Lịch sử trò chuyện")
-    
     files = [f for f in os.listdir(HISTORY_DIR) if f.endswith(".json")]
     
     if not files:
@@ -142,7 +138,6 @@ with st.sidebar:
         sorted_files = sorted(files, key=lambda x: os.path.getmtime(os.path.join(HISTORY_DIR, x)), reverse=True)
         display_files = []
         
-        # Bộ lọc tìm kiếm toàn cầu
         if search_query:
             search_query_lower = search_query.lower()
             for f in sorted_files:
@@ -150,14 +145,11 @@ with st.sidebar:
                 try:
                     with open(file_path, "r", encoding="utf-8") as file:
                         data = json.load(file)
-                        # Tìm trong tiêu đề
                         if search_query_lower in data.get("title", "").lower():
                             display_files.append(f)
                             continue
-                        # Tìm trong nội dung tin nhắn
                         msgs = data.get("full_history", data.get("messages", []))
-                        match_found = any(search_query_lower in m.get("content", "").lower() for m in msgs)
-                        if match_found:
+                        if any(search_query_lower in m.get("content", "").lower() for m in msgs):
                             display_files.append(f)
                 except:
                     continue
@@ -177,7 +169,6 @@ with st.sidebar:
             except:
                 continue
             
-            # Kiểm tra xem đoạn chat này có đang ở chế độ đổi tên hay không
             if st.session_state.renaming_id == session_id:
                 new_title_input = st.text_input("Tên mới:", value=title, key=f"input_rename_{session_id}")
                 col_save, col_cancel = st.columns(2)
@@ -195,7 +186,6 @@ with st.sidebar:
                         st.session_state.renaming_id = None
                         st.rerun()
             else:
-                # Bố cục 3 cột tỷ lệ chuẩn
                 col_chat, col_rename, col_del = st.columns([3.2, 0.9, 0.9])
                 with col_chat:
                     btn_type = "primary" if session_id == st.session_state.session_id else "secondary"
@@ -204,21 +194,18 @@ with st.sidebar:
                         st.session_state.renaming_id = None
                         st.rerun()
                 with col_rename:
-                    if st.button("✏️", key=f"rename_btn_{session_id}", use_container_width=True, help="Đổi tên đoạn chat này"):
+                    if st.button("✏️", key=f"rename_btn_{session_id}", use_container_width=True):
                         st.session_state.renaming_id = session_id
                         st.rerun()
                 with col_del:
-                    if st.button("🗑️", key=f"del_{session_id}", use_container_width=True, help="Xóa đoạn chat này"):
+                    if st.button("🗑️", key=f"del_{session_id}", use_container_width=True):
                         delete_chat(session_id)
                         st.session_state.renaming_id = None
                         st.rerun()
 
     st.markdown("---")
     with st.expander("📌 Cẩm nang & Hỗ trợ (Quan trọng)"):
-        st.warning("⚠️ **Lưu ý Ngữ Cảnh & Lưu Trữ:**\n\n1. **Đổi chủ đề:** Bấm 'Bắt đầu Chủ đề mới' để tránh AI nhầm lẫn dữ liệu cũ.\n2. **Lưu tiến trình (!save):** Gõ `!save` để đóng gói ngữ cảnh trước khi rời đi.\n3. **Khôi phục (!load):** Chọn lại tên chat cũ, gõ `!load [yêu cầu mới]` để tiếp tục.")
-        st.markdown("**Kênh Hỗ trợ & Báo lỗi:**")
-        st.link_button("✈️ Telegram Admin", "https://t.me/hkha45", use_container_width=True)
-        st.link_button("👾 Server Discord", "https://discord.gg/dXMjFUXeJj", use_container_width=True)
+        st.warning("⚠️ **Lưu ý Ngữ Cảnh & Lưu Trữ:**\n\n1. **Đổi chủ đề:** Bấm 'Bắt đầu Chủ đề mới' để tránh AI nhầm lẫn dữ liệu cũ.\n2. **Lưu tiến trình (!save):** Gõ `!save` để đóng gói ngữ cảnh.\n3. **Khôi phục (!load):** Chọn lịch sử, gõ `!load [yêu cầu mới]`.")
 
 # --- GIAO DIỆN CHÍNH ---
 st.title("👨‍💻 GDU_OOM_CodeMentor Workspace")
@@ -240,7 +227,7 @@ with col3:
 
 st.divider()
 
-# Hiển thị tất cả tin nhắn từ luồng full_history (Không bao giờ xóa)
+# Hiển thị tất cả tin nhắn từ luồng full_history
 for msg in st.session_state.full_history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -252,19 +239,18 @@ def process_ai_response(user_message):
     if st.session_state.chat_title == "Cuộc trò chuyện mới" and not is_save_cmd:
         st.session_state.chat_title = generate_smart_title(user_message)
     
-    # Lưu vào cả 2 luồng
     user_obj = {"role": "user", "content": user_message}
     st.session_state.messages.append(user_obj)
-    if not is_save_cmd: # Không hiện chữ !save ra màn hình để đỡ rối
+    
+    if not is_save_cmd: 
         st.session_state.full_history.append(user_obj)
         with st.chat_message("user"):
             st.markdown(user_message)
     
-    # XỬ LÝ LỆNH !SAVE
     if is_save_cmd:
         with st.spinner("Đang lưu trữ tiến trình ngữ cảnh..."):
             force_summarize()
-            reply = "💾 **Tiến trình đã được lưu an toàn!** Bạn có thể đóng trình duyệt. Lần tới quay lại, hãy chọn đúng tên lịch sử này và dùng lệnh `!load [yêu cầu mới]` để tiếp tục."
+            reply = "💾 **Tiến trình đã được lưu an toàn!** Bạn có thể đóng trình duyệt."
             st.session_state.messages.append({"role": "assistant", "content": reply})
             st.session_state.full_history.append({"role": "assistant", "content": reply})
             with st.chat_message("assistant"):
@@ -274,9 +260,8 @@ def process_ai_response(user_message):
 
     api_messages = list(st.session_state.messages)
     if is_load_cmd:
-        api_messages.append({"role": "system", "content": "Người dùng vừa kích hoạt lệnh !load để khôi phục phiên. Hãy dựa vào TÓM TẮT NGỮ CẢNH để tiếp tục giải quyết yêu cầu."})
+        api_messages.append({"role": "system", "content": "Kích hoạt !load. Hãy dựa vào TÓM TẮT NGỮ CẢNH để tiếp tục giải quyết."})
 
-    # Gọi API AI phản hồi
     with st.chat_message("assistant"):
         with st.spinner("Đang phân tích mã nguồn..."):
             try:
@@ -293,18 +278,21 @@ def process_ai_response(user_message):
                     "*⚠️ **Lưu ý kỹ thuật:** Tôi là trợ lý trí tuệ nhân tạo, kết quả phân tích có thể có sai số. Hãy luôn tự kiểm tra lại mã nguồn trước khi áp dụng thực tế.*"
                 )
                 
-                reply = raw_reply + professional_footer
-                st.markdown(reply)
+                # Nối Footer để hiển thị (không cho vào AI)
+                reply_with_footer = raw_reply + professional_footer
+                st.markdown(reply_with_footer)
                 
-                # Lưu phản hồi vào cả 2 luồng
-                bot_obj = {"role": "assistant", "content": reply}
-                st.session_state.messages.append(bot_obj)
-                st.session_state.full_history.append(bot_obj)
+                # CHỈ lưu raw vào API để AI không học vẹt Footer
+                st.session_state.messages.append({"role": "assistant", "content": raw_reply})
                 
-                # Điều kiện chuẩn 10 lượt chat (21 messages bao gồm cả system) mới nén ngữ cảnh
-                if len(st.session_state.messages) > 21:
+                # Lưu đầy đủ có Footer vào UI
+                st.session_state.full_history.append({"role": "assistant", "content": reply_with_footer})
+                
+                # 10 lượt chat = 20 user+bot + 1 system = 21 messages. Khi chạm mốc này sẽ kích hoạt!
+                if len(st.session_state.messages) >= 21:
                     force_summarize()
-                    st.toast("🧠 Hệ thống đã tự động nén gọn ngữ cảnh để duy trì độ mượt mà!", icon="✅")
+                    # CẢNH BÁO CHO THUYẾT TRÌNH: Dùng st.success nổi bần bật giữa màn hình
+                    st.success("✅ **HỆ THỐNG GDU_OOM_CODEMENTOR:** Đã đạt 10 lượt trò chuyện. Bộ nhớ ngữ cảnh (Context Window) đã được nén tự động để chống lỗi OOM. Lịch sử hiển thị vẫn được giữ nguyên!")
                 
                 save_chat_to_disk()
             except Exception as e:
@@ -314,6 +302,6 @@ if trigger_prompt:
     process_ai_response(trigger_prompt)
     st.rerun()
 
-if user_input := st.chat_input("Dán mã nguồn hoặc nhập câu hỏi (Dùng !save / !load để quản lý ngữ cảnh)..."):
+if user_input := st.chat_input("Dán mã nguồn hoặc nhập câu hỏi..."):
     process_ai_response(user_input)
     st.rerun()
