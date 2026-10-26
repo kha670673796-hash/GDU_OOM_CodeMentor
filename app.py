@@ -18,7 +18,7 @@ if not os.path.exists(HISTORY_DIR):
     os.makedirs(HISTORY_DIR)
 
 # Khởi tạo API Client qua OpenRouter
-api_key = "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"
+api_key = "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"
 client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
 
 # --- CÁC HÀM XỬ LÝ LÔ-GIC ---
