@@ -17,8 +17,8 @@ HISTORY_DIR = "GDU_Chat_History"
 if not os.path.exists(HISTORY_DIR):
     os.makedirs(HISTORY_DIR)
 
-# Khởi tạo API Client qua OpenRouter (Đã chèn Key mới của bạn)
-api_key = "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"
+# Khởi tạo API Client qua OpenRouter (Đã chèn Key mới để dùng gpt-4o-mini)
+api_key = "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"
 client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
 
 # --- CÁC HÀM XỬ LÝ LÔ-GIC ---
@@ -79,7 +79,7 @@ def generate_smart_title(first_user_msg):
         return "Gỡ lỗi mã nguồn"
     try:
         res = client.chat.completions.create(
-            model="google/gemini-2.0-flash-exp:free",
+            model="openai/gpt-4o-mini",
             messages=[{"role": "user", "content": f"Tóm tắt câu sau thành 1 tiêu đề ngắn gọn (3-5 từ): '{clean_msg}'"}],
             temperature=0.3
         )
@@ -101,7 +101,7 @@ def force_summarize():
         prompt += "\nGộp chung ngữ cảnh cũ và hội thoại này thành 1 đoạn tóm tắt duy nhất (dưới 150 chữ)."
         try:
             res = client.chat.completions.create(
-                model="google/gemini-2.0-flash-exp:free",
+                model="openai/gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1
             )
@@ -294,7 +294,7 @@ def process_ai_response(user_message):
         with st.spinner("Đang phân tích mã nguồn..."):
             try:
                 res = client.chat.completions.create(
-                    model="google/gemini-2.0-flash-exp:free", 
+                    model="openai/gpt-4o-mini", 
                     messages=api_messages, 
                     temperature=0.2
                 )
