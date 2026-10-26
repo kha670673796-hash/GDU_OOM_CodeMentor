@@ -213,4 +213,131 @@ with st.sidebar:
     with st.expander("📌 Cẩm nang & Hỗ trợ (Quan trọng)"):
         st.warning("⚠️ **Lưu ý Ngữ Cảnh & Lưu Trữ:**\n\n1. **Đổi chủ đề:** Bấm 'Bắt đầu Chủ đề mới' để tránh AI nhầm lẫn dữ liệu cũ.\n2. **Lưu tiến trình (!save):** Gõ `!save` để đóng gói ngữ cảnh trước khi rời đi.\n3. **Khôi phục (!load):** Chọn lại tên chat cũ, gõ `!load [yêu cầu mới]` để tiếp tục.")
         st.markdown("**Kênh Hỗ trợ & Báo lỗi:**")
-        st.link_button("✈️ Telegram
+        st.link_button("✈️ Telegram Admin", "https://t.me/hkha45", use_container_width=True)
+        st.link_button("👾 Server Discord", "https://discord.gg/dXMjFUXeJj", use_container_width=True)
+
+# --- GIAO DIỆN CHÍNH ---
+st.title("👨‍💻 GDU_OOM_CodeMentor Workspace")
+st.markdown(f"### *{st.session_state.chat_title}*")
+
+# Thanh 4 Gợi ý thao tác nhanh
+st.markdown("**Gợi ý thao tác nhanh:**")
+col1, col2, col3, col4 = st.columns(4)
+trigger_prompt = None
+with col1:
+    if st.button("🔍 Rà soát lỗi", use_container_width=True):
+        trigger_prompt = "Tôi có một đoạn code đang bị lỗi logic. Hãy chuẩn bị tinh thần rà soát từng dòng."
+with col2:
+    if st.button("💡 Giải thích luồng", use_container_width=True):
+        trigger_prompt = "Hãy đóng vai trò là một giảng viên giải thích chi tiết hoạt động của code."
+with col3:
+    if st.button("🚀 Tối ưu hiệu suất", use_container_width=True):
+        trigger_prompt = "Hãy đánh giá độ phức tạp thuật toán và đề xuất giải pháp tối ưu code."
+with col4:
+    if st.button("✨ Khởi tạo code", use_container_width=True):
+        trigger_prompt = "Tôi cần viết một đoạn code mới. Hãy hướng dẫn và tạo bộ khung chuẩn cho tôi."
+
+st.divider()
+
+# Tính năng Upload File
+st.markdown("📂 **Tải lên file mã nguồn (.py, .txt, .cpp, .lua, .js, .java)**")
+uploaded_file = st.file_uploader("Upload", type=["py", "txt", "cpp", "lua", "js", "java"], label_visibility="collapsed")
+if uploaded_file is not None:
+    if st.session_state.get("last_uploaded_file") != uploaded_file.name:
+        try:
+            file_content = uploaded_file.getvalue().decode("utf-8")
+            st.session_state.last_uploaded_file = uploaded_file.name
+            trigger_prompt = f"Tôi vừa tải lên file `{uploaded_file.name}`. Dưới đây là nội dung:\n\n```\n{file_content}\n```\n\nHãy phân tích tổng quan file này giúp tôi."
+        except Exception as e:
+            st.error("Lỗi khi đọc file. Vui lòng đảm bảo file chứa định dạng văn bản (text).")
+
+st.divider()
+
+# Hiển thị tất cả tin nhắn từ luồng full_history (Không bao giờ xóa)
+for msg in st.session_state.full_history:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+def process_ai_response(user_message):
+    is_save_cmd = user_message.strip().lower() == "!save"
+    is_load_cmd = user_message.strip().lower().startswith("!load")
+
+    if st.session_state.chat_title == "Cuộc trò chuyện mới" and not is_save_cmd:
+        st.session_state.chat_title = generate_smart_title(user_message)
+    
+    # Lưu vào cả 2 luồng
+    user_obj = {"role": "user", "content": user_message}
+    st.session_state.messages.append(user_obj)
+    if not is_save_cmd:
+        st.session_state.full_history.append(user_obj)
+        with st.chat_message("user"):
+            st.markdown(user_message)
+    
+    # XỬ LÝ LỆNH !SAVE
+    if is_save_cmd:
+        with st.spinner("Đang lưu trữ tiến trình ngữ cảnh..."):
+            force_summarize()
+            reply = "💾 **Tiến trình đã được lưu an toàn!** Bạn có thể đóng trình duyệt. Lần tới quay lại, hãy chọn đúng tên lịch sử này và dùng lệnh `!load [yêu cầu mới]` để tiếp tục."
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            st.session_state.full_history.append({"role": "assistant", "content": reply})
+            with st.chat_message("assistant"):
+                st.markdown(reply)
+            save_chat_to_disk()
+            return
+
+    api_messages = list(st.session_state.messages)
+    if is_load_cmd:
+        api_messages.append({"role": "system", "content": "Người dùng vừa kích hoạt lệnh !load để khôi phục phiên. Hãy dựa vào TÓM TẮT NGỮ CẢNH để tiếp tục giải quyết yêu cầu."})
+
+    # Gọi API AI phản hồi
+    with st.chat_message("assistant"):
+        with st.spinner("Đang phân tích mã nguồn..."):
+            try:
+                res = client.chat.completions.create(
+                    model="google/gemini-2.0-flash-exp:free", 
+                    messages=api_messages, 
+                    temperature=0.2
+                )
+                raw_reply = res.choices[0].message.content
+                
+                professional_footer = (
+                    "\n\n---\n"
+                    "*💡 **Gợi ý học tập:** Bạn đã nắm rõ logic của đoạn code này chưa? Nếu có điểm nào còn mơ hồ, hãy hỏi lại tôi ngay nhé!*\n\n"
+                    "*⚠️ **Lưu ý kỹ thuật:** Tôi là trợ lý trí tuệ nhân tạo, kết quả phân tích có thể có sai số. Hãy luôn tự kiểm tra lại mã nguồn trước khi áp dụng thực tế.*"
+                )
+                
+                reply_with_footer = raw_reply + professional_footer
+                st.markdown(reply_with_footer)
+                
+                # FIX BỊ LẶP FOOTER: AI chỉ lưu raw, UI lưu full
+                bot_obj_for_ai = {"role": "assistant", "content": raw_reply}
+                st.session_state.messages.append(bot_obj_for_ai)
+                
+                bot_obj_for_ui = {"role": "assistant", "content": reply_with_footer}
+                st.session_state.full_history.append(bot_obj_for_ui)
+                
+                # FIX AUTO-SAVE TÀNG HÌNH: Đạt mốc 10 lượt trò chuyện -> Hiển thị bảng thông báo nổi bật
+                if len(st.session_state.messages) > 21:
+                    force_summarize()
+                    notice_msg = "✅ **Hệ thống (Auto-Save):** Đã đạt mốc 10 lượt trò chuyện. Ngữ cảnh đã được tự động nén và lưu trữ thành công để tối ưu bộ nhớ. Bạn vẫn có thể xem lại toàn bộ tin nhắn phía trên bình thường!"
+                    st.session_state.full_history.append({"role": "assistant", "content": notice_msg})
+                    st.rerun()
+                
+                save_chat_to_disk()
+            except Exception as e:
+                # Xóa tin nhắn rác để không bị trôi luồng
+                if len(st.session_state.messages) > 1 and st.session_state.messages[-1]["role"] == "user":
+                    st.session_state.messages.pop()
+                
+                # Bắn thông báo tĩnh bám trụ trên màn hình
+                error_msg = f"❌ **Lỗi Kết Nối AI:** `{e}`\n\n👉 *Hệ thống không thể phản hồi. Khả năng cao API Key OpenRouter của bạn đã hết hạn mức (Credits) hoặc máy chủ đang bảo trì. Hãy kiểm tra lại tài khoản API trên web OpenRouter!*"
+                st.session_state.full_history.append({"role": "assistant", "content": error_msg})
+                st.rerun() 
+
+if trigger_prompt:
+    process_ai_response(trigger_prompt)
+    st.rerun()
+
+if user_input := st.chat_input("Dán mã nguồn hoặc nhập câu hỏi (Dùng !save / !load để quản lý ngữ cảnh)..."):
+    process_ai_response(user_input)
+    st.rerun()
