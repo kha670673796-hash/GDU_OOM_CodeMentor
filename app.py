@@ -36,9 +36,8 @@ def init_new_session():
     st.session_state.session_id = str(uuid.uuid4())
     st.session_state.chat_title = "Cuộc trò chuyện mới"
     st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-    st.session_state.full_history = [] # Tách biệt luồng hiển thị để không mất tin nhắn cũ
+    st.session_state.full_history = [] 
     st.session_state.context_summary = ""
-    st.session_state.last_uploaded_file = None
 
 def save_chat_to_disk():
     if not st.session_state.full_history:
@@ -65,7 +64,6 @@ def load_chat_from_disk(session_id):
             st.session_state.messages = data.get("messages", [])
             raw_history = data.get("full_history", data.get("messages", []))
             st.session_state.full_history = [m for m in raw_history if m["role"] != "system"]
-            st.session_state.last_uploaded_file = None
 
 def delete_chat(session_id):
     file_path = os.path.join(HISTORY_DIR, f"{session_id}.json")
@@ -109,7 +107,6 @@ def force_summarize():
             new_summary = res.choices[0].message.content
             st.session_state.context_summary = new_summary
             
-            # Chỉ giới hạn mảng API ngầm, không tác động đến full_history hiển thị
             new_messages = [st.session_state.messages[0]]
             new_messages.append({"role": "system", "content": f"[TÓM TẮT NGỮ CẢNH BẮT BUỘC]: {new_summary}"})
             new_messages.extend(st.session_state.messages[-2:])
@@ -123,6 +120,10 @@ if "session_id" not in st.session_state:
 
 if "renaming_id" not in st.session_state:
     st.session_state.renaming_id = None
+    
+# Cờ quản lý tự động làm mới khung Upload File
+if "file_uploader_key" not in st.session_state:
+    st.session_state.file_uploader_key = 0
 
 # --- GIAO DIỆN SIDEBAR ---
 with st.sidebar:
@@ -221,36 +222,50 @@ with st.sidebar:
 st.title("👨‍💻 GDU_OOM_CodeMentor Workspace")
 st.markdown(f"### *{st.session_state.chat_title}*")
 
+# Lấy dữ liệu file hiện tại (nếu có) trước khi render các nút bấm
+current_uploader_key = f"uploader_{st.session_state.file_uploader_key}"
+uploaded_file = st.session_state.get(current_uploader_key)
+current_file_addon = ""
+
+if uploaded_file is not None:
+    try:
+        file_content = uploaded_file.getvalue().decode("utf-8")
+        current_file_addon = f"\n\n👇 **Mã nguồn đính kèm từ file `{uploaded_file.name}`:**\n```\n{file_content}\n```"
+    except Exception:
+        pass
+
+# Hàm dọn dẹp file sau khi đã gửi đi
+def clear_uploaded_file():
+    st.session_state.file_uploader_key += 1
+
 # Thanh 4 Gợi ý thao tác nhanh
 st.markdown("**Gợi ý thao tác nhanh:**")
 col1, col2, col3, col4 = st.columns(4)
 trigger_prompt = None
+
 with col1:
     if st.button("🔍 Rà soát lỗi", use_container_width=True):
-        trigger_prompt = "Tôi có một đoạn code đang bị lỗi logic. Hãy chuẩn bị tinh thần rà soát từng dòng."
+        trigger_prompt = "Tôi có một đoạn code đang bị lỗi logic. Hãy chuẩn bị tinh thần rà soát từng dòng." + current_file_addon
+        if current_file_addon: clear_uploaded_file()
 with col2:
     if st.button("💡 Giải thích luồng", use_container_width=True):
-        trigger_prompt = "Hãy đóng vai trò là một giảng viên giải thích chi tiết hoạt động của code."
+        trigger_prompt = "Hãy đóng vai trò là một giảng viên giải thích chi tiết hoạt động của code." + current_file_addon
+        if current_file_addon: clear_uploaded_file()
 with col3:
     if st.button("🚀 Tối ưu hiệu suất", use_container_width=True):
-        trigger_prompt = "Hãy đánh giá độ phức tạp thuật toán và đề xuất giải pháp tối ưu code."
+        trigger_prompt = "Hãy đánh giá độ phức tạp thuật toán và đề xuất giải pháp tối ưu code." + current_file_addon
+        if current_file_addon: clear_uploaded_file()
 with col4:
     if st.button("✨ Khởi tạo code", use_container_width=True):
-        trigger_prompt = "Tôi cần viết một đoạn code mới. Hãy hướng dẫn và tạo bộ khung chuẩn cho tôi."
+        trigger_prompt = "Tôi cần viết một đoạn code mới. Hãy hướng dẫn và tạo bộ khung chuẩn cho tôi." + current_file_addon
+        if current_file_addon: clear_uploaded_file()
 
 st.divider()
 
-# Tính năng Upload File
+# Khung Upload File sẽ luôn sử dụng khóa động (Dynamic Key) để dọn dẹp
 st.markdown("📂 **Tải lên file mã nguồn (.py, .txt, .cpp, .lua, .js, .java)**")
-uploaded_file = st.file_uploader("Upload", type=["py", "txt", "cpp", "lua", "js", "java"], label_visibility="collapsed")
-if uploaded_file is not None:
-    if st.session_state.get("last_uploaded_file") != uploaded_file.name:
-        try:
-            file_content = uploaded_file.getvalue().decode("utf-8")
-            st.session_state.last_uploaded_file = uploaded_file.name
-            trigger_prompt = f"Tôi vừa tải lên file `{uploaded_file.name}`. Dưới đây là nội dung:\n\n```\n{file_content}\n```\n\nHãy phân tích tổng quan file này giúp tôi."
-        except Exception as e:
-            st.error("Lỗi khi đọc file. Vui lòng đảm bảo file chứa định dạng văn bản (text).")
+latest_uploader_key = f"uploader_{st.session_state.file_uploader_key}"
+st.file_uploader("Upload", type=["py", "txt", "cpp", "lua", "js", "java"], label_visibility="collapsed", key=latest_uploader_key)
 
 st.divider()
 
@@ -310,14 +325,12 @@ def process_ai_response(user_message):
                 reply_with_footer = raw_reply + professional_footer
                 st.markdown(reply_with_footer)
                 
-                # FIX BỊ LẶP FOOTER: AI chỉ lưu raw, UI lưu full
                 bot_obj_for_ai = {"role": "assistant", "content": raw_reply}
                 st.session_state.messages.append(bot_obj_for_ai)
                 
                 bot_obj_for_ui = {"role": "assistant", "content": reply_with_footer}
                 st.session_state.full_history.append(bot_obj_for_ui)
                 
-                # CHÍNH XÁC YÊU CẦU: Save ở mốc 10 tin nhắn (5 lượt), hiện thông báo 4 giây rồi biến mất làm bằng chứng thuyết trình!
                 if len(st.session_state.messages) > 10:
                     force_summarize()
                     save_chat_to_disk()
@@ -333,7 +346,6 @@ def process_ai_response(user_message):
                 if len(st.session_state.messages) > 1 and st.session_state.messages[-1]["role"] == "user":
                     st.session_state.messages.pop()
                 
-                # Bắn thông báo tĩnh bám trụ trên màn hình
                 error_msg = f"❌ **Lỗi Kết Nối AI:** `{e}`\n\n👉 *Hệ thống không thể phản hồi. Khả năng cao API Key OpenRouter của bạn đã hết hạn mức (Credits) hoặc máy chủ đang bảo trì. Hãy kiểm tra lại tài khoản API trên web OpenRouter!*"
                 st.session_state.full_history.append({"role": "assistant", "content": error_msg})
                 st.rerun() 
@@ -342,6 +354,11 @@ if trigger_prompt:
     process_ai_response(trigger_prompt)
     st.rerun()
 
+# Ô Chat đầu vào bình thường
 if user_input := st.chat_input("Dán mã nguồn hoặc nhập câu hỏi (Dùng !save / !load để quản lý ngữ cảnh)..."):
-    process_ai_response(user_input)
+    # Gộp code từ file (nếu có) vào tin nhắn chat
+    final_prompt = user_input + current_file_addon
+    if current_file_addon:
+        clear_uploaded_file() # Xóa uploader sau khi gộp
+    process_ai_response(final_prompt)
     st.rerun()
