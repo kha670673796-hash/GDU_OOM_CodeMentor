@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+import time
 import streamlit as st
 from openai import OpenAI
 
@@ -17,7 +18,7 @@ HISTORY_DIR = "GDU_Chat_History"
 if not os.path.exists(HISTORY_DIR):
     os.makedirs(HISTORY_DIR)
 
-# Khởi tạo API Client qua OpenRouter (Đã chèn Key mới để dùng gpt-4o-mini)
+# Khởi tạo API Client qua OpenRouter (Key mới - model gpt-4o-mini)
 api_key = "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"
 client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
 
@@ -316,14 +317,17 @@ def process_ai_response(user_message):
                 bot_obj_for_ui = {"role": "assistant", "content": reply_with_footer}
                 st.session_state.full_history.append(bot_obj_for_ui)
                 
-                # FIX AUTO-SAVE TÀNG HÌNH: Đạt mốc 10 lượt trò chuyện -> Hiển thị bảng thông báo nổi bật
-                if len(st.session_state.messages) > 21:
+                # CHÍNH XÁC YÊU CẦU: Save ở mốc 10 tin nhắn (5 lượt), hiện thông báo 4 giây rồi biến mất làm bằng chứng thuyết trình!
+                if len(st.session_state.messages) > 10:
                     force_summarize()
-                    notice_msg = "✅ **Hệ thống (Auto-Save):** Đã đạt mốc 10 lượt trò chuyện. Ngữ cảnh đã được tự động nén và lưu trữ thành công để tối ưu bộ nhớ. Bạn vẫn có thể xem lại toàn bộ tin nhắn phía trên bình thường!"
-                    st.session_state.full_history.append({"role": "assistant", "content": notice_msg})
-                    st.rerun()
-                
-                save_chat_to_disk()
+                    save_chat_to_disk()
+                    
+                    noti = st.empty()
+                    noti.success("✅ **Hệ thống (Auto-Save):** Đã đạt mốc 10 tin nhắn (5 lượt trò chuyện). Ngữ cảnh đã được tự động lưu trữ an toàn!")
+                    time.sleep(4)
+                    noti.empty()
+                else:
+                    save_chat_to_disk()
             except Exception as e:
                 # Xóa tin nhắn rác để không bị trôi luồng
                 if len(st.session_state.messages) > 1 and st.session_state.messages[-1]["role"] == "user":
